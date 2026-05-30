@@ -5,7 +5,7 @@ from streamlit_folium import st_folium
 from sklearn.neighbors import NearestNeighbors
 import geopandas as gpd
 
-st.set_page_config(page_title="Quartier idéal - Paris", layout="wide")
+st.set_page_config(page_title="Find your ideal neighborhood - Paris", layout="wide")
 
 @st.cache_data
 def load_data():
@@ -42,17 +42,17 @@ cols_model = [
     "Enseignement", "Espaces verts", "Santé", "Sport", "Tourisme", "Transports"
 ]
 
-st.title("Trouvez votre quartier idéal à Paris")
-st.caption("Sélectionnez vos critères et découvrez les 5 IRIS qui correspondent le mieux à votre profil.")
+st.title("Find your ideal neighborhood in Paris")
+st.caption("Select your preferences and discover the 5 neighborhoods that best match your profile.")
 
 col1, col2 = st.columns([1, 2.5])
 
 with col1:
     with st.form(key=f"form_{st.session_state.reset_counter}"):
-        st.subheader("Vos critères")
+        st.subheader("Your criteria")
 
         prix_max = st.slider(
-            "Budget maximum (€/m²)",
+            "Maximum budget (€/m²)",
             min_value=int(data_iris["prix_m2_median"].min()),
             max_value=int(data_iris["prix_m2_median"].max()),
             value=int(data_iris["prix_m2_median"].max()),
@@ -60,27 +60,27 @@ with col1:
             format="%d €"
         )
 
-        st.markdown("**Importance de chaque catégorie** *(0 = pas important, 1 = très important)*")
+        st.markdown("**Importance of each category** *(0 = not important, 1 = very important)*")
 
-        animation = st.slider("Animation", 0.0, 1.0, 0.5, step=0.1)
-        commerce = st.slider("Commerces et services de proximité", 0.0, 1.0, 0.5, step=0.1)
-        culture = st.slider("Culture et loisirs", 0.0, 1.0, 0.5, step=0.1)
-        enseignement = st.slider("Enseignement", 0.0, 1.0, 0.5, step=0.1)
-        espaces_verts = st.slider("Espaces verts", 0.0, 1.0, 0.5, step=0.1)
-        sante = st.slider("Santé", 0.0, 1.0, 0.5, step=0.1)
-        sport = st.slider("Sport", 0.0, 1.0, 0.5, step=0.1)
-        tourisme = st.slider("Tourisme", 0.0, 1.0, 0.5, step=0.1)
-        transport = st.slider("Transports", 0.0, 1.0, 0.5, step=0.1)
+        animation = st.slider("Nightlife & restaurants", 0.0, 1.0, 0.5, step=0.1)
+        commerce = st.slider("Shops & proximity services", 0.0, 1.0, 0.5, step=0.1)
+        culture = st.slider("Culture & leisure", 0.0, 1.0, 0.5, step=0.1)
+        enseignement = st.slider("Education", 0.0, 1.0, 0.5, step=0.1)
+        espaces_verts = st.slider("Green spaces", 0.0, 1.0, 0.5, step=0.1)
+        sante = st.slider("Health services", 0.0, 1.0, 0.5, step=0.1)
+        sport = st.slider("Sport facilities", 0.0, 1.0, 0.5, step=0.1)
+        tourisme = st.slider("Tourism", 0.0, 1.0, 0.5, step=0.1)
+        transport = st.slider("Public transport", 0.0, 1.0, 0.5, step=0.1)
 
-        bouton = st.form_submit_button("🔍 Rechercher", use_container_width=True)
+        bouton = st.form_submit_button("Search", use_container_width=True)
 
-    st.button("Réinitialiser", on_click=reset_all, use_container_width=True)
+    st.button("Reset", on_click=reset_all, use_container_width=True)
 
     if bouton:
         data_filtre = data_iris[data_iris["prix_m2_median"] <= prix_max].copy()
 
         if data_filtre.empty:
-            st.warning("Aucun IRIS ne correspond à ce budget. Essayez un budget plus élevé.")
+            st.warning("No neighborhood matches this budget. Please try a higher budget.")
         else:
             X = data_filtre[cols_model].values
             knn = NearestNeighbors(n_neighbors=min(5, len(data_filtre)), metric="euclidean")
@@ -99,10 +99,10 @@ with col1:
                 nom = nom_row["nom_iris"].values[0] if not nom_row.empty else code
                 iris_selectionnes.append(code)
                 resultats.append({
-                    "Rang": i + 1,
-                    "Quartier": nom,
+                    "Rank": i + 1,
+                    "Neighborhood": nom,
                     "Arrondissement": int(ardt),
-                    "Prix médian (€/m²)": f"{int(prix):,} €".replace(",", " "),
+                    "Median price (€/m²)": f"{int(prix):,} €".replace(",", " "),
                     "Distance": round(dist, 4)
                 })
 
@@ -111,7 +111,7 @@ with col1:
             st.session_state.recherche_faite = True
 
     if st.session_state.recherche_faite and st.session_state.resultats:
-        st.subheader("Résultats")
+        st.subheader("Results")
         df_resultats = pd.DataFrame(st.session_state.resultats)
         st.dataframe(df_resultats, use_container_width=True, hide_index=True)
 
@@ -132,7 +132,7 @@ with col2:
             },
             tooltip=folium.GeoJsonTooltip(
                 fields=["nom_iris", "prix_m2_median"],
-                aliases=["Quartier", "Prix médian (€/m²)"],
+                aliases=["Neighborhood", "Median price (€/m²)"],
                 localize=True
             )
         ).add_to(carte)
@@ -147,7 +147,7 @@ with col2:
             },
             tooltip=folium.GeoJsonTooltip(
                 fields=["nom_iris", "prix_m2_median"],
-                aliases=["Quartier", "Prix médian (€/m²)"],
+                aliases=["Neighborhood", "Median price (€/m²)"],
                 localize=True
             )
         ).add_to(carte)
@@ -161,7 +161,7 @@ with col2:
             fill_color="YlOrRd",
             fill_opacity=0.7,
             line_opacity=0.3,
-            legend_name="Prix médian m² par IRIS"
+            legend_name="Median price per m² by IRIS"
         ).add_to(carte)
 
         folium.GeoJson(
@@ -169,7 +169,7 @@ with col2:
             style_function=lambda x: {"fillOpacity": 0, "color": "transparent"},
             tooltip=folium.GeoJsonTooltip(
                 fields=["nom_iris", "prix_m2_median"],
-                aliases=["Quartier", "Prix médian (€/m²)"],
+                aliases=["Neighborhood", "Median price (€/m²)"],
                 localize=True
             )
         ).add_to(carte)
