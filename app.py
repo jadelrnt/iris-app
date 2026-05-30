@@ -2,8 +2,11 @@ import streamlit as st
 import pandas as pd
 import folium
 from streamlit_folium import st_folium
-from sklearn.neighbors import NearestNeighbors
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.cluster import KMeans
+from sklearn.metrics.pairwise import cosine_similarity
 import geopandas as gpd
+import numpy as np
 
 st.set_page_config(page_title="Find your ideal neighborhood - Paris", layout="wide")
 
@@ -20,7 +23,25 @@ def load_data():
     )
     return data_iris, iris_merged
 
+@st.cache_resource
+def train_models(data_iris):
+    cols_model = [
+        "Animation", "Commerces et services de proximité", "Culture et loisirs",
+        "Enseignement", "Espaces verts", "Santé", "Sport", "Tourisme", "Transports"
+    ]
+    X = data_iris[cols_model].values
+
+    kmeans = KMeans(n_clusters=3, random_state=42)
+    data_iris = data_iris.copy()
+    data_iris["cluster"] = kmeans.fit_predict(X)
+
+    rf = RandomForestClassifier(n_estimators=100, random_state=42)
+    rf.fit(X, data_iris["cluster"].values)
+
+    return rf, kmeans, data_iris, cols_model
+
 data_iris, iris_merged = load_data()
+rf, kmeans, data_iris_clustered, cols_model = train_models(data_iris)
 
 if "recherche_faite" not in st.session_state:
     st.session_state.recherche_faite = False
@@ -36,11 +57,6 @@ def reset_all():
     st.session_state.iris_selectionnes = []
     st.session_state.resultats = []
     st.session_state.reset_counter += 1
-
-cols_model = [
-    "Animation", "Commerces et services de proximité", "Culture et loisirs",
-    "Enseignement", "Espaces verts", "Santé", "Sport", "Tourisme", "Transports"
-]
 
 st.title("Find your ideal neighborhood in Paris")
 st.caption("Select your preferences and discover the 5 neighborhoods that best match your profile.")
@@ -77,24 +93,33 @@ with col1:
     st.button("Reset", on_click=reset_all, use_container_width=True)
 
     if bouton:
-        data_filtre = data_iris[data_iris["prix_m2_median"] <= prix_max].copy()
+        profil = np.array([[animation, commerce, culture, enseignement,
+                           espaces_verts, sante, sport, tourisme, transport]])
+
+        cluster_predit = rf.predict(profil)[0]
+
+        data_filtre = data_iris_clustered[
+            (data_iris_clustered["prix_m2_median"] <= prix_max) &
+            (data_iris_clustered["cluster"] == cluster_predit)
+        ].copy()
 
         if data_filtre.empty:
-            st.warning("No neighborhood matches this budget. Please try a higher budget.")
+            st.warning("No neighborhood matches this budget in your profile cluster. Try a higher budget.")
         else:
-            X = data_filtre[cols_model].values
-            knn = NearestNeighbors(n_neighbors=min(5, len(data_filtre)), metric="euclidean")
-            knn.fit(X)
+            X_cluster = data_filtre[cols_model].values
+            similarites = cosine_similarity(profil, X_cluster)[0]
+            data_filtre = data_filtre.copy()
+            data_filtre["similarite"] = similarites
 
-            profil = [[animation, commerce, culture, enseignement, espaces_verts, sante, sport, tourisme, transport]]
-            distances, indices = knn.kneighbors(profil)
+            top5 = data_filtre.nlargest(5, "similarite")
 
             resultats = []
             iris_selectionnes = []
-            for i, (idx, dist) in enumerate(zip(indices[0], distances[0])):
-                code = data_filtre["code_iris"].iloc[idx]
-                ardt = data_filtre["arrondissement"].iloc[idx]
-                prix = data_filtre["prix_m2_median"].iloc[idx]
+            for i, (_, row) in enumerate(top5.iterrows()):
+                code = row["code_iris"]
+                ardt = row["arrondissement"]
+                prix = row["prix_m2_median"]
+                sim = row["similarite"]
                 nom_row = iris_merged[iris_merged["code_iris"] == code]
                 nom = nom_row["nom_iris"].values[0] if not nom_row.empty else code
                 iris_selectionnes.append(code)
@@ -102,12 +127,16 @@ with col1:
                     "Rank": i + 1,
                     "Neighborhood": nom,
                     "Arrondissement": int(ardt),
-                    "Median price (€/m²)": f"{int(prix):,} €".replace(",", " ")
+                    "Median price (€/m²)": f"{int(prix):,} €".replace(",", " "),
+                    "Match": f"{round(sim * 100, 1)}%"
                 })
 
             st.session_state.iris_selectionnes = iris_selectionnes
             st.session_state.resultats = resultats
             st.session_state.recherche_faite = True
+
+        cluster_labels = {0: "Quiet residential", 1: "Residential with services", 2: "Animated & commercial"}
+        st.info(f"Your profile matches: **{cluster_labels.get(cluster_predit, cluster_predit)}** neighborhoods.")
 
     if st.session_state.recherche_faite and st.session_state.resultats:
         st.subheader("Results")
