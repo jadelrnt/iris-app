@@ -11,13 +11,9 @@ st.set_page_config(page_title="Find your ideal neighborhood - Paris", layout="wi
 def load_data():
     data_iris = pd.read_csv("data_agg_iris.csv")
     data_iris["code_iris"] = data_iris["code_iris"].astype(str).str.replace(".0", "", regex=False)
-    try:
-        iris_geo = gpd.read_file("iris.shp", encoding="utf-8")
-    except:
-        iris_geo = gpd.read_file("iris.shp", encoding="latin-1")
+    iris_geo = gpd.read_file("iris.shp", encoding="latin-1")
     iris_geo["code_iris"] = iris_geo["code_iris"].astype(str).str.replace(".0", "", regex=False)
     iris_geo = iris_geo[iris_geo["dep"] == "75"]
-    iris_geo["nom_iris"] = iris_geo["nom_iris"].str.encode("latin-1").str.decode("utf-8", errors="replace")
     iris_merged = iris_geo.merge(
         data_iris[["code_iris", "prix_m2_median", "arrondissement"]],
         on="code_iris", how="left"
